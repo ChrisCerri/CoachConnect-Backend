@@ -1,0 +1,47 @@
+version: '3.8' # La versione della sintassi di Docker Compose
+
+services:
+  # Servizio PHP-FPM: esegue il tuo backend Laravel
+  php-fpm:
+    build:
+      context: . # Il contesto di build è la directory corrente (la root del tuo progetto Laravel)
+      dockerfile: Dockerfile # Specifica che userà il file 'Dockerfile' in questa directory
+    container_name: laravel_php_fpm # Un nome riconoscibile per il container
+    volumes:
+      - .:/var/www/html # Monta la directory locale del tuo progetto Laravel all'interno del container.
+                        # Questo è fondamentale per lo sviluppo: le modifiche al codice sul tuo computer
+                        # si rifletteranno istantaneamente nel container senza doverlo ricostruire.
+    environment:
+      # Variabili d'ambiente per Laravel (per la connessione al tuo DB Aiven)
+      DB_CONNECTION: mysql
+      DB_HOST: coachconnect-db-christian-5a3e.g.aivencloud.com # L'host del tuo DB Aiven
+      DB_PORT: 18913 # La porta del tuo DB Aiven
+      DB_DATABASE: coachconnect # Il nome del tuo database su Aiven (o 'defaultdb' se hai importato lì)
+      DB_USERNAME: avnadmin # Il tuo nome utente Aiven
+      # --- QUI LE VARIABILI SENSIBILI VENGONO CARICATE DALL'AMBIENTE O DA UN FILE .env ESTERNO ---
+      DB_PASSWORD: ${DB_PASSWORD} # <-- NON metti qui la password diretta! Verrà caricata dall'ambiente.
+
+      # Altre variabili d'ambiente di Laravel essenziali per il container
+      APP_ENV: local # Imposta l'ambiente dell'applicazione su 'local'
+      APP_DEBUG: 'true' # Abilita la modalità di debug
+      APP_KEY: ${APP_KEY} # <-- NON metti qui la APP_KEY diretta! Verrà caricata dall'ambiente.
+      APP_URL: http://localhost # Questo è l'URL a cui Laravel pensa di rispondere (per il frontend Vite)
+    restart: always # Il container si riavvierà automaticamente se si ferma
+
+  # Servizio Nginx: il web server che serve la tua applicazione Laravel
+  nginx:
+    image: nginx:stable-alpine # Usa un'immagine ufficiale e leggera di Nginx
+    container_name: laravel_nginx # Un nome riconoscibile per il container
+    ports:
+      - "80:80" # Mappa la porta 80 del container alla porta 80 del tuo computer host.
+                # Questo significa che puoi accedere alla tua applicazione Laravel tramite http://localhost
+    volumes:
+      - .:/var/www/html # Monta la root del tuo progetto Laravel anche per Nginx.
+                        # Nginx ha bisogno di accedere alla cartella 'public' di Laravel.
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf # Monta il tuo file di configurazione Nginx personalizzato
+    depends_on:
+      - php-fpm # Indica che Nginx dipende dal servizio php-fpm, quindi php-fpm verrà avviato prima di Nginx
+    restart: always # Il container si riavvierà automaticamente se si ferma
+
+# Importante: Il tuo database MySQL su Aiven è un servizio esterno ai container Docker Compose.
+# Pertanto, non lo si definisce qui. I container Laravel si connetteranno ad esso tramite le variabili d'ambiente.
